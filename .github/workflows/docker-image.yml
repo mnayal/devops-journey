@@ -1,18 +1,40 @@
-name: Docker Image CI
+name: Publish image to ECR
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+permissions:
+  id-token: write
 
 jobs:
-
   build:
-
+    name: Build image
     runs-on: ubuntu-latest
+    env:
+      AWS_DEFAULT_REGION: ap-south-1
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag devopsjourneyapi:$(date +%s)
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Creds
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ASSUME_ROLE }}
+          role-session-name: ${{ secrets.AWS_ROLE_SESSION }}
+          aws-region: ${{env.AWS_DEFAULT_REGION}}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: msingh-se-devops-images
+          IMAGE_TAG: fastapi-hello
+
+        run: |
+          docker build . --file Dockerfile --tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
